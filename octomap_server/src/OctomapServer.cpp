@@ -148,6 +148,7 @@ OctomapServer::OctomapServer(ros::NodeHandle private_nh_)
   m_pointCloudSub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh, "cloud_in", 5);
   m_tfPointCloudSub = new tf::MessageFilter<sensor_msgs::PointCloud2> (*m_pointCloudSub, m_tfListener, m_worldFrameId, 5);
   m_tfPointCloudSub->registerCallback(boost::bind(&OctomapServer::insertCloudCallback, this, _1));
+  m_kf_sub = m_nh.subscribe("keyframes_to_octomap", 100, &OctomapServer::insertKeyframeCallback,this);
 
   m_octomapBinaryService = m_nh.advertiseService("octomap_binary", &OctomapServer::octomapBinarySrv, this);
   m_octomapFullService = m_nh.advertiseService("octomap_full", &OctomapServer::octomapFullSrv, this);
@@ -230,6 +231,46 @@ bool OctomapServer::openFile(const std::string& filename){
 
   return true;
 
+}
+
+void OctomapServer::insertKeyframeCallback(const qbo_graph_slam_messages::Keyframe kf_msg){
+  ros::WallTime startTime = ros::WallTime::now();
+
+
+  tf::StampedTransform sensorToWorldTf;
+  tf::poseMsgToTF(kf_msg.pose,sensorToWorldTf);
+
+  PCLPointCloud pc; // input cloud for filtering and ground-detection
+  pcl::fromROSMsg(kf_msg.pcl, pc);
+
+
+  // set up filter for height range, also removes NANs:
+  pcl::PassThrough<pcl::PointXYZ> pass;
+  pass.setFilterFieldName("z");
+  pass.setFilterLimits(m_pointcloudMinZ, m_pointcloudMaxZ);
+
+  PCLPointCloud pc_ground; // segmented ground plane
+  PCLPointCloud pc_nonground; // everything else
+
+
+
+  // just filter height range:
+  pass.setInputCloud(pc.makeShared());
+  pass.filter(pc);
+
+  pc_nonground = pc;
+  // pc_nonground is empty without ground segmentation
+  pc_ground.header = pc.header;
+  pc_nonground.header = pc.header;
+
+
+
+  insertScan(sensorToWorldTf.getOrigin(), pc_ground, pc_nonground);
+
+  double total_elapsed = (ros::WallTime::now() - startTime).toSec();
+  ROS_DEBUG("Pointcloud insertion in OctomapServer done (%zu+%zu pts (ground/nonground), %f sec)", pc_ground.size(), pc_nonground.size(), total_elapsed);
+
+  publishAll(kf_msg.pcl.header.stamp);
 }
 
 void OctomapServer::insertCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud){

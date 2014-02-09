@@ -13,7 +13,8 @@ set(PACKAGE_DEPENDENCIES
   octomap_ros
   octomap_msgs
   dynamic_reconfigure
-  nodelet  
+  nodelet
+  qbo_graph_slam_messages
 )
 
 
@@ -33,6 +34,7 @@ include_directories(
 
 
 generate_dynamic_reconfigure_options(cfg/OctomapServer.cfg)
+
 
 catkin_package(
   INCLUDE_DIRS include

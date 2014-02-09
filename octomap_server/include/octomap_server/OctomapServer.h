@@ -66,6 +66,7 @@
 #include <octomap/octomap.h>
 #include <octomap/OcTreeKey.h>
 
+#include <qbo_graph_slam_messages/Keyframe.h>
 
 namespace octomap_server {
 class OctomapServer{
@@ -84,6 +85,7 @@ public:
   bool clearBBXSrv(BBXSrv::Request& req, BBXSrv::Response& resp);
   bool resetSrv(std_srvs::Empty::Request& req, std_srvs::Empty::Response& resp);
 
+  void insertKeyframeCallback(const qbo_graph_slam_messages::Keyframe kf_msg);
   virtual void insertCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud);
   virtual bool openFile(const std::string& filename);
 
@@ -194,6 +196,7 @@ protected:
   ros::ServiceServer m_octomapBinaryService, m_octomapFullService, m_clearBBXService, m_resetService;
   tf::TransformListener m_tfListener;
   dynamic_reconfigure::Server<OctomapServerConfig> m_reconfigureServer;
+  ros::Subscriber m_kf_sub;
 
   octomap::OcTree* m_octree;
   octomap::KeyRay m_keyRay;  // temp storage for ray casting
